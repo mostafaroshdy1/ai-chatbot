@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1749665347661,
+      "tag": "0000_dashing_deathstrike",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1749670081209,
+      "tag": "0001_rapid_franklin_richards",
+      "breakpoints": true
+    }
+  ]
+}
