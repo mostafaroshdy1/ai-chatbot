@@ -4,6 +4,11 @@ import { aiModelProviders } from './ai-model-provider';
 
 export const aiModels = pgTable('ai_models', {
   id: t.integer().primaryKey().generatedAlwaysAsIdentity(),
-  ProviderId: t.integer().references(() => aiModelProviders.id),
-  name: t.varchar().unique(),
+  ProviderId: t
+    .integer()
+    .notNull()
+    .references(() => aiModelProviders.id),
+  name: t.varchar().notNull().unique(),
+  maxInputToken: t.integer().notNull(),
+  createdAt: t.timestamp().notNull().defaultNow(),
 });
