@@ -10,14 +10,14 @@ export class JwtSignService {
     private readonly appConfigService: AppConfigService,
   ) {}
 
-  accessTokenSign(payload: UserModels.CurrentUser): Promise<string> {
+  accessTokenSign(payload: UserModels.AccessToken): Promise<string> {
     return this.jwtService.signAsync(payload, {
       secret: this.appConfigService.config.Auth.jwtAccessSecret,
       expiresIn: this.appConfigService.config.Auth.jwtAccessLifespan,
     });
   }
 
-  refreshTokenSign(payload: UserModels.CurrentUser): Promise<string> {
+  refreshTokenSign(payload: UserModels.RefreshToken): Promise<string> {
     return this.jwtService.signAsync(payload, {
       secret: this.appConfigService.config.Auth.jwtRefreshSecret,
       expiresIn: this.appConfigService.config.Auth.jwtRefreshLifespan,

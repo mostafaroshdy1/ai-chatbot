@@ -15,7 +15,7 @@ export class UserRepository {
       .from(users)
       .where(eq(users.id, id));
 
-    return user;
+    return user ? user : null;
   }
 
   async getByEmail(email: string) {
@@ -24,7 +24,7 @@ export class UserRepository {
       .from(users)
       .where(eq(users.email, email));
 
-    return user;
+    return user ? user : null;
   }
 
   async create(data: CreateUserDto) {
