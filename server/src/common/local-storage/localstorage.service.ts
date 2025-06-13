@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { AsyncLocalStorage } from 'async_hooks';
-import { UserModels } from 'src/models/user.models';
+import { UserModels } from 'src/user/user.models';
 import { LocalStorageModels } from './localstorage.models';
 import { LocalStorageError } from './localstorage.error';
 

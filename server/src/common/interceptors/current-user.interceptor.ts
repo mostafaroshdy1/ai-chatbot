@@ -5,8 +5,8 @@ import {
   NestInterceptor,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
-import { LocalStorageService } from 'src/local-storage/localstorage.service';
-import { UserModels } from 'src/models/user.models';
+import { LocalStorageService } from 'src/common/local-storage/localstorage.service';
+import { UserModels } from 'src/user/user.models';
 
 @Injectable()
 export class CurrentUserInterceptor implements NestInterceptor {
