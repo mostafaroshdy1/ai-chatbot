@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { UserRepository } from 'src/common/repository/user.repository';
+import { UserRepository } from 'src/user/user.repository';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UserError } from './user.error';
 import { HashService } from 'src/common/hash/hash.service';
