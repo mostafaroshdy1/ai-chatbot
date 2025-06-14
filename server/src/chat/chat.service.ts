@@ -9,11 +9,11 @@ import {
 import { ChatRepository } from './repository/chat.repository';
 import { LocalStorageService } from 'src/common/local-storage/localstorage.service';
 import { ChatError } from './chat.error';
-import { AiChatModelsMapper } from './strategies/chat-models.mapper';
 import { AiStrategyFactory } from './strategies/ai-strategy.factory';
-import { AiModelRepository } from './repository/ai-model.repository';
 import { NewAiMessage } from './models/new-message.model';
 import { catchError, finalize, map, Observable, tap } from 'rxjs';
+import { AiModelsService } from 'src/ai-models/ai-models.service';
+import { AiModel } from './strategies/models/ai-models';
 
 @Injectable()
 export class ChatService {
@@ -21,7 +21,7 @@ export class ChatService {
     private readonly chatRepository: ChatRepository,
     private readonly localStorageService: LocalStorageService,
     private readonly aiStrategyFactory: AiStrategyFactory,
-    private readonly aiModelRepository: AiModelRepository,
+    private readonly aiModelsService: AiModelsService,
   ) {}
 
   private logger = new Logger(ChatService.name);
@@ -39,11 +39,7 @@ export class ChatService {
     return this.chatRepository.createNewChat(userId);
   }
 
-  async AskMessageToChat(
-    chatId: string,
-    message: string,
-    aiModel: keyof typeof AiChatModelsMapper,
-  ) {
+  async AskMessageToChat(chatId: string, message: string, aiModelId: number) {
     const canSend = await this.canSendMessageToChat(chatId);
     if (!canSend.result) {
       throw canSend.error;
@@ -72,14 +68,20 @@ export class ChatService {
     };
     fullChat.push(newMessage);
 
-    const aiStrategy = this.aiStrategyFactory.getStrategy(aiModel);
+    const aiModelData = await this.aiModelsService.getAiModelData(aiModelId);
 
-    const aiModelData = await this.aiModelRepository.getAiModel(aiModel);
+    if (!aiModelData) {
+      throw new BadRequestException(ChatError.AiModelNotAvailable);
+    }
+    const { apiKey, name: aiModelName } = aiModelData;
+
+    const aiStrategy = this.aiStrategyFactory.getStrategy(
+      aiModelName as AiModel,
+    );
 
     if (!aiModelData) {
       throw new InternalServerErrorException();
     }
-    const { apiKey, id: aiModelId } = aiModelData;
     await this.chatRepository.addMessageToChat({
       ...newMessage,
       chatId,
@@ -89,7 +91,7 @@ export class ChatService {
 
     const obs = aiStrategy.sendMessage(fullChat, {
       apiKey,
-      model: aiModel,
+      model: aiModelName,
     });
     let fullResponse = '';
 

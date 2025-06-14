@@ -47,7 +47,11 @@ export class ChatController {
     @Param('chatId', ParseUUIDPipe) chatId: string,
     @Body() data: PromptDto,
   ) {
-    return this.aiChatService.AskMessageToChat(chatId, data.prompt, data.model);
+    return this.aiChatService.AskMessageToChat(
+      chatId,
+      data.prompt,
+      data.aiModelId,
+    );
   }
 
   @HttpCode(HttpStatus.OK)

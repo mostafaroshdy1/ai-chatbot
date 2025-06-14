@@ -9,17 +9,35 @@ import { aiModels } from 'src/db/schema/ai-models';
 export class AiModelRepository {
   constructor(@Inject(DRIZZLE) private readonly repository: Repository) {}
 
-  async getAiModel(modelName: string) {
+  async getAiModelData(aiModelId: number) {
     const [aiModel] = await this.repository
       .select({
         apiKey: aiModelProviders.apiKey,
-        id: aiModels.id,
+        name: aiModels.name,
       })
       .from(aiModelProviders)
-      .where(eq(aiModels.name, modelName))
+      .where(eq(aiModels.id, aiModelId))
       .innerJoin(aiModels, eq(aiModelProviders.id, aiModels.ProviderId))
       .execute();
 
     return aiModel ? aiModel : null;
+  }
+
+  async getAllModels() {
+    const models = await this.repository
+      .select({
+        id: aiModels.id,
+        name: aiModels.name,
+        maxInputToken: aiModels.maxInputToken,
+        providerName: aiModelProviders.name,
+        providerId: aiModelProviders.id,
+      })
+      .from(aiModels)
+      .innerJoin(
+        aiModelProviders,
+        eq(aiModels.ProviderId, aiModelProviders.id),
+      );
+
+    return models;
   }
 }

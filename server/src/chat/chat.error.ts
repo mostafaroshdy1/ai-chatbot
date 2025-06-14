@@ -4,4 +4,5 @@ export enum ChatError {
   ErrorStreamingResponse = 'Error streaming response',
   NoStreamingForThisChat = 'No streaming for this chat',
   ErrorUpdatingChatLabel = 'Error updating chat label',
+  AiModelNotAvailable = 'AI model not available',
 }

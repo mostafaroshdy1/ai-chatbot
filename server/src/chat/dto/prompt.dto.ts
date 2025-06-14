@@ -1,5 +1,4 @@
-import { IsNotEmpty, IsString } from 'class-validator';
-import { AiModel } from '../strategies/models/ai-models';
+import { IsNotEmpty, IsNumber, IsString } from 'class-validator';
 
 export class PromptDto {
   @IsNotEmpty()
@@ -7,6 +6,6 @@ export class PromptDto {
   prompt: string;
 
   @IsNotEmpty()
-  @IsString()
-  model: AiModel;
+  @IsNumber()
+  aiModelId: number;
 }

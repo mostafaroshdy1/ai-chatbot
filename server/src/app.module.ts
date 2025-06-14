@@ -8,6 +8,7 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
 import { CurrentUserInterceptor } from './common/interceptors/current-user.interceptor';
 import { DrizzleModule } from './db/drizzle.module';
 import { AIChatModule } from './chat/chat.module';
+import { AiModelsModule } from './ai-models/ai-models.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { AIChatModule } from './chat/chat.module';
     UserModule,
     AuthModule,
     AIChatModule,
+    AiModelsModule,
   ],
   providers: [
     {
