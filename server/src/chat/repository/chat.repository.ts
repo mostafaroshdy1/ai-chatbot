@@ -1,9 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import { DRIZZLE } from 'src/db/drizzle.module';
 import { Repository } from 'src/db/drizzle.types';
 import { chats } from 'src/db/schema/chat';
 import { chatMessages } from 'src/db/schema/chat-messages';
+import { MessageRole } from '../models/message-role.model';
 
 @Injectable()
 export class ChatRepository {
@@ -36,7 +37,7 @@ export class ChatRepository {
     chatId: string;
     userId: number;
     aiModelId: number;
-    role: 'user' | 'assistant' | 'system';
+    role: MessageRole;
     content: string;
     completionTokens?: number;
     promptTokens?: number;
@@ -44,16 +45,35 @@ export class ChatRepository {
     return this.repository.insert(chatMessages).values(data).execute();
   }
 
-  async getChatMessages(chatId: string) {
+  async getChatMessages(chatId: string, userId: number) {
     const messages = await this.repository
       .select({
         content: chatMessages.content,
         role: chatMessages.role,
+        createdAt: chatMessages.createdAt,
       })
       .from(chatMessages)
-      .where(eq(chatMessages.chatId, chatId))
+      .where(
+        and(eq(chatMessages.chatId, chatId), eq(chatMessages.userId, userId)),
+      )
+
       .orderBy(asc(chatMessages.createdAt));
 
     return messages;
+  }
+
+  async getAllChats(userId: number, data: { offset: number; limit: number }) {
+    const chatsData = await this.repository
+      .select({
+        chatId: chats.id,
+        createdAt: chats.createdAt,
+      })
+      .from(chats)
+      .orderBy(desc(chats.createdAt))
+      .where(eq(chats.userId, userId))
+      .limit(data.limit)
+      .offset(data.offset);
+
+    return chatsData;
   }
 }

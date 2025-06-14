@@ -1,4 +1,6 @@
+import { MessageRole } from './message-role.model';
+
 export interface NewAiMessage {
-  role: 'user' | 'assistant' | 'system';
+  role: MessageRole;
   content: string;
 }

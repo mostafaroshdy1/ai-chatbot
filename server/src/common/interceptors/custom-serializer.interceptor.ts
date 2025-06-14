@@ -17,9 +17,8 @@ export class CustomSerializerInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler) {
     const isSse = this.reflector.get<string>('sse', context.getHandler());
-    if (isSse) {
-      return next.handle();
-    }
+    if (isSse) return next.handle();
+
     return next.handle().pipe(
       map((value) =>
         instanceToPlain(value, {

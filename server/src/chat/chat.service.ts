@@ -51,8 +51,10 @@ export class ChatService {
 
     const { id: userId } = this.localStorageService.getCurrentUser();
 
-    const fullChat: NewAiMessage[] =
-      await this.chatRepository.getChatMessages(chatId);
+    const fullChat: NewAiMessage[] = await this.chatRepository.getChatMessages(
+      chatId,
+      userId,
+    );
 
     const newMessage: NewAiMessage = {
       role: 'user',
@@ -148,5 +150,15 @@ export class ChatService {
       result: true,
       error: null,
     };
+  }
+
+  getChatMessages(chatId: string) {
+    const { id: userId } = this.localStorageService.getCurrentUser();
+    return this.chatRepository.getChatMessages(chatId, userId);
+  }
+
+  getAllChats(data: { offset: number; limit: number }) {
+    const { id: userId } = this.localStorageService.getCurrentUser();
+    return this.chatRepository.getAllChats(userId, data);
   }
 }
