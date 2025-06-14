@@ -1,4 +1,4 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { CustomSerializerInterceptor } from './common/interceptors/custom-serializer.interceptor';
@@ -19,7 +19,7 @@ async function bootstrap() {
   );
 
   app.useGlobalInterceptors(
-    new CustomSerializerInterceptor({
+    new CustomSerializerInterceptor(app.get(Reflector), {
       excludeExtraneousValues: true,
     }),
   );

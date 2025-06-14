@@ -15,13 +15,13 @@ export const chatMessages = pgTable('chat_messages', {
     .uuid()
     .notNull()
     .references(() => chats.id, { onDelete: 'cascade' }),
-  AiModelId: t
+  aiModelId: t
     .integer()
     .notNull()
     .references(() => aiModels.id),
   role: AiRoleEnum().notNull(),
   content: t.text().notNull(),
   createdAt: t.timestamp().notNull().defaultNow(),
-  promptTokens: t.integer().notNull(),
-  completionTokens: t.integer().notNull(),
+  promptTokens: t.integer(),
+  completionTokens: t.integer(),
 });
