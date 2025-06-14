@@ -18,15 +18,14 @@ import { AccessTokenGuard } from 'src/common/guards/access-token.guard';
 import { PromptDto } from './dto/prompt.dto';
 import { Observable } from 'rxjs';
 import { ChatMessageDto } from './dto/chat-messages.dto';
+import { ChatDto } from './dto/chat.dto';
 @UseGuards(AccessTokenGuard)
 @Controller('chat')
 export class ChatController {
   constructor(private readonly aiChatService: ChatService) {}
 
   @Get()
-  async getAllChats(
-    @Query() data: { offset: number; limit: number },
-  ): Promise<CreateChatDto[]> {
+  async getAllChats(@Query() data: ChatDto): Promise<CreateChatDto[]> {
     const chats = await this.aiChatService.getAllChats(data);
     return plainToInstance(CreateChatDto, chats);
   }
