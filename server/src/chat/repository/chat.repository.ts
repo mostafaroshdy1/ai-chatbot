@@ -19,6 +19,7 @@ export class ChatRepository {
       .returning({
         chatId: chats.id,
         createdAt: chats.createdAt,
+        label: chats.label,
       });
 
     return chat;
@@ -62,11 +63,19 @@ export class ChatRepository {
     return messages;
   }
 
+  async updateChatLabel(chatId: string, label: string) {
+    return this.repository
+      .update(chats)
+      .set({ label })
+      .where(eq(chats.id, chatId));
+  }
+
   async getAllChats(userId: number, data: { offset: number; limit: number }) {
     const chatsData = await this.repository
       .select({
         chatId: chats.id,
         createdAt: chats.createdAt,
+        label: chats.label,
       })
       .from(chats)
       .orderBy(desc(chats.createdAt))

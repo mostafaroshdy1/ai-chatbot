@@ -9,4 +9,5 @@ export const chats = pgTable('chats', {
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
   createdAt: t.timestamp().notNull().defaultNow(),
+  label: t.varchar({ length: 256 }),
 });

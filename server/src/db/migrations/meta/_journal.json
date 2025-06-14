@@ -15,6 +15,13 @@
       "when": 1749909082900,
       "tag": "0001_heavy_groot",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1749925153327,
+      "tag": "0002_magenta_the_santerians",
+      "breakpoints": true
     }
   ]
 }

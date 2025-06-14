@@ -56,6 +56,16 @@ export class ChatService {
       userId,
     );
 
+    if (fullChat.length === 0) {
+      // take first 7 words of the message as a label for the chat
+      const newChatLabel = message.split(' ').slice(0, 7).join(' ').trim();
+      this.chatRepository.updateChatLabel(chatId, newChatLabel).catch((err) => {
+        this.logger.error(
+          `${ChatError.ErrorUpdatingChatLabel} ${chatId}: ${err}`,
+        );
+      });
+    }
+
     const newMessage: NewAiMessage = {
       role: 'user',
       content: message,

@@ -5,4 +5,6 @@ export class CreateChatDto {
   chatId: number;
   @Expose()
   createdAt: Date;
+  @Expose()
+  label: string;
 }

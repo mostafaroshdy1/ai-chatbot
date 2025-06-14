@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   MessageEvent,
   Param,
   ParseUUIDPipe,
@@ -24,6 +26,7 @@ import { ChatDto } from './dto/chat.dto';
 export class ChatController {
   constructor(private readonly aiChatService: ChatService) {}
 
+  @HttpCode(HttpStatus.OK)
   @Get()
   async getAllChats(@Query() data: ChatDto): Promise<CreateChatDto[]> {
     const chats = await this.aiChatService.getAllChats(data);
@@ -31,12 +34,14 @@ export class ChatController {
   }
 
   // creates a new chat
+  @HttpCode(HttpStatus.CREATED)
   @Post()
   async createChat(): Promise<CreateChatDto> {
     const chat = await this.aiChatService.createNewChat();
     return plainToInstance(CreateChatDto, chat);
   }
 
+  @HttpCode(HttpStatus.CREATED)
   @Post(':chatId')
   async addMessageToChat(
     @Param('chatId', ParseUUIDPipe) chatId: string,
@@ -45,6 +50,7 @@ export class ChatController {
     return this.aiChatService.AskMessageToChat(chatId, data.prompt, data.model);
   }
 
+  @HttpCode(HttpStatus.OK)
   @SetMetadata('sse', true)
   @Sse(':chatId/stream')
   streamChatMessages(
@@ -53,6 +59,7 @@ export class ChatController {
     return this.aiChatService.getStreamingObservable(chatId);
   }
 
+  @HttpCode(HttpStatus.OK)
   @Get(':chatId')
   async getChatMessages(
     @Param('chatId', ParseUUIDPipe) chatId: string,
