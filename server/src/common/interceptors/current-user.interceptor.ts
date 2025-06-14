@@ -17,9 +17,11 @@ export class CurrentUserInterceptor implements NestInterceptor {
       .switchToHttp()
       .getRequest<UserModels.UserLoginRequest>();
 
-    this.localStorageService.setCurrentUser({
-      id: request.user.id,
-    });
+    if (request.user) {
+      this.localStorageService.setCurrentUser({
+        id: request.user?.id,
+      });
+    }
 
     return next.handle();
   }

@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { CurrentUserInterceptor } from './common/interceptors/current-user.interceptor';
 import { DrizzleModule } from './db/drizzle.module';
+import { AIChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { DrizzleModule } from './db/drizzle.module';
     LocalStorageModule,
     UserModule,
     AuthModule,
+    AIChatModule,
   ],
   providers: [
     {
