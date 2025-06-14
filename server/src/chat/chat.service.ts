@@ -56,9 +56,9 @@ export class ChatService {
       userId,
     );
 
+    let newChatLabel;
     if (fullChat.length === 0) {
-      // take first 7 words of the message as a label for the chat
-      const newChatLabel = message.split(' ').slice(0, 7).join(' ').trim();
+      newChatLabel = message.split(' ').slice(0, 7).join(' ').trim();
       this.chatRepository.updateChatLabel(chatId, newChatLabel).catch((err) => {
         this.logger.error(
           `${ChatError.ErrorUpdatingChatLabel} ${chatId}: ${err}`,
@@ -135,7 +135,7 @@ export class ChatService {
 
     this.streamingObservableToChat.set(chatId, messageEventObservable);
 
-    return { success: true };
+    return { success: true, chatLabel: newChatLabel };
   }
 
   private async canSendMessageToChat(chatId: string) {
