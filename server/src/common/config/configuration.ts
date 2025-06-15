@@ -16,4 +16,8 @@ export default registerAs('Config', () => ({
   Host: {
     port: process.env.PORT,
   },
+
+  Cache: {
+    redisUrl: process.env.REDIS_URL,
+  },
 }));
