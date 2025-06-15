@@ -3,4 +3,5 @@ export interface AIResponseStreamModel {
   promptTokenCount?: number;
   completionTokenCount?: number;
   isFinal?: boolean;
+  id: string; // ordered by ulid
 }

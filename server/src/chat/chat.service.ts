@@ -117,6 +117,7 @@ export class ChatService {
           data: {
             text: res.text,
             isFinal: res.isFinal,
+            id: res.id,
           },
           type: 'message',
         };
