@@ -1,5 +1,4 @@
-import { Request } from 'express';
-
+import { FastifyRequest } from 'fastify';
 export namespace UserModels {
   // used in accessToken and refreshToken payloads
   export interface RefreshToken {
@@ -8,11 +7,11 @@ export namespace UserModels {
 
   export interface AccessToken extends RefreshToken {}
 
-  export interface UserLoginRequest extends Request {
+  export interface UserLoginRequest extends FastifyRequest {
     user: AccessToken;
   }
 
-  export interface UserRefreshRequest extends Request {
+  export interface UserRefreshRequest extends FastifyRequest {
     user: RefreshToken;
   }
 }

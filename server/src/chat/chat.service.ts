@@ -136,6 +136,7 @@ export class ChatService {
     );
 
     this.streamingObservableToChat.set(chatId, messageEventObservable);
+    messageEventObservable.subscribe();
 
     return { success: true, chatLabel: newChatLabel };
   }
