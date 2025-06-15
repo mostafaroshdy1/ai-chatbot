@@ -11,9 +11,20 @@ import { LocalStorageService } from 'src/common/local-storage/localstorage.servi
 import { ChatError } from './chat.error';
 import { AiStrategyFactory } from './strategies/ai-strategy.factory';
 import { NewAiMessage } from './models/new-message.model';
-import { catchError, finalize, map, Observable, tap } from 'rxjs';
+import {
+  catchError,
+  finalize,
+  map,
+  Observable,
+  ReplaySubject,
+  tap,
+  throwError,
+  timeout,
+  TimeoutError,
+} from 'rxjs';
 import { AiModelsService } from 'src/ai-models/ai-models.service';
 import { AiModel } from './strategies/models/ai-models';
+import { RedisService } from 'src/cache/redis.service';
 
 @Injectable()
 export class ChatService {
@@ -22,6 +33,7 @@ export class ChatService {
     private readonly localStorageService: LocalStorageService,
     private readonly aiStrategyFactory: AiStrategyFactory,
     private readonly aiModelsService: AiModelsService,
+    private readonly redisService: RedisService,
   ) {}
 
   private logger = new Logger(ChatService.name);
@@ -29,8 +41,42 @@ export class ChatService {
   streamingObservableToChat = new Map<string, Observable<MessageEvent>>();
 
   getStreamingObservable(chatId: string): Observable<MessageEvent> {
-    const obs = this.streamingObservableToChat.get(chatId);
-    if (!obs) throw new BadRequestException(ChatError.NoStreamingForThisChat);
+    let obs = this.streamingObservableToChat.get(chatId);
+    if (!obs) {
+      this.logger.log(`Subscribing to ${chatId} for streaming messages`);
+      const replaySubject = new ReplaySubject<MessageEvent>(Infinity);
+
+      this.redisService.subscribeToId(chatId, (message) => {
+        const messageEvent: MessageEvent = {
+          data: message,
+          type: 'message',
+        };
+        replaySubject.next(messageEvent);
+      });
+
+      obs = replaySubject.asObservable().pipe(
+        timeout(30_000),
+        catchError((err) => {
+          if (err instanceof TimeoutError) {
+            this.logger.warn(
+              `Auto-unsubscribing from ${chatId} due to inactivity`,
+            );
+            return new Observable<MessageEvent>((subscriber) =>
+              subscriber.complete(),
+            );
+          }
+          return throwError(() => err);
+        }),
+        finalize(() => {
+          this.redisService.unsubscribeFromId(chatId);
+          this.streamingObservableToChat.delete(chatId);
+          this.logger.log(`Unsubscribed from ${chatId}`);
+        }),
+      );
+
+      // Store the observable in the map
+      this.streamingObservableToChat.set(chatId, obs);
+    }
     return obs;
   }
 
@@ -111,7 +157,23 @@ export class ChatService {
             promptTokens: res.promptTokenCount,
           });
         }
+
+        this.redisService
+          .publishToId(
+            chatId,
+            JSON.stringify({
+              text: res.text,
+              isFinal: res.isFinal,
+              id: res.id,
+            }),
+          )
+          .catch((err) => {
+            this.logger.error(
+              `${ChatError.ErrorPublishingMessage} ${chatId}: ${err}`,
+            );
+          });
       }),
+
       map((res) => {
         const messageEvent: MessageEvent = {
           data: {
@@ -123,6 +185,7 @@ export class ChatService {
         };
         return messageEvent;
       }),
+
       finalize(() => this.streamingObservableToChat.delete(chatId)),
 
       catchError((err) => {
@@ -136,7 +199,7 @@ export class ChatService {
       }),
     );
 
-    this.streamingObservableToChat.set(chatId, messageEventObservable);
+    // this.streamingObservableToChat.set(chatId, messageEventObservable);
     messageEventObservable.subscribe();
 
     return { success: true, chatLabel: newChatLabel };

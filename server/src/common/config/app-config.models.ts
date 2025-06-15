@@ -26,6 +26,11 @@ class Host {
   port: number;
 }
 
+class Cache {
+  @IsString()
+  redisUrl: string;
+}
+
 export class Config {
   @IsString()
   NODE_ENV: string;
@@ -41,4 +46,8 @@ export class Config {
   @ValidateNested()
   @Type(() => Host)
   Host: Host;
+
+  @ValidateNested()
+  @Type(() => Cache)
+  Cache: Cache;
 }
