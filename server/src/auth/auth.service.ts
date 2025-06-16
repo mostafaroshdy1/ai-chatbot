@@ -24,12 +24,14 @@ export class AuthService {
   }
 
   async login(payload: UserModels.AccessToken) {
-    const [accessToken, refreshToken] = await Promise.all([
+    const { id: userId } = payload;
+    const [accessToken, refreshToken, currentUser] = await Promise.all([
       this.jwtSignService.accessTokenSign(payload),
       this.jwtSignService.refreshTokenSign(payload),
+      this.userService.getCurrentUserPayload(userId),
     ]);
 
-    return { accessToken, refreshToken };
+    return { accessToken, refreshToken, currentUser };
   }
 
   async refresh(userBase: UserModels.RefreshToken) {
