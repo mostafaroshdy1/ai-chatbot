@@ -3,7 +3,7 @@ import { NewAiMessage } from '../models/new-message.model';
 import { AIResponseStreamModel } from './models/stream.model';
 import { AiModelData } from '../models/ai-model-data.model';
 
-export interface IAiChat {
+export interface IAIChat {
   sendMessage(
     messages: NewAiMessage[],
     modelData: AiModelData,

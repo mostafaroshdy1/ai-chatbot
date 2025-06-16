@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { AiChatModelsMapper } from './chat-models.mapper';
-import { IAiChat } from './IAichat';
+import { IAIChat } from './IAIchat';
 
 @Injectable()
 export class AiStrategyFactory {
-  cachedStrategies: Partial<Record<keyof typeof AiChatModelsMapper, IAiChat>> =
+  cachedStrategies: Partial<Record<keyof typeof AiChatModelsMapper, IAIChat>> =
     {};
 
   getStrategy(strategyName: keyof typeof AiChatModelsMapper) {

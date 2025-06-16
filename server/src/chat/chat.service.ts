@@ -16,6 +16,7 @@ import {
   finalize,
   map,
   Observable,
+  of,
   ReplaySubject,
   tap,
   throwError,
@@ -193,9 +194,7 @@ export class ChatService {
         this.logger.error(
           `${ChatError.ErrorStreamingResponse} ${chatId}: ${err}`,
         );
-        throw new InternalServerErrorException(
-          ChatError.ErrorStreamingResponse,
-        );
+        return of({ error: ChatError.ErrorStreamingResponse });
       }),
     );
 
