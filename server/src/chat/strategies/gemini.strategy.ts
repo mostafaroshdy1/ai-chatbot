@@ -1,12 +1,12 @@
 import { Observable, ReplaySubject } from 'rxjs';
-import { IAiChat } from './IAichat';
+import { IAIChat } from './IAIchat';
 import { GenerateContentResponse, GoogleGenAI } from '@google/genai';
 import { AIResponseStreamModel } from './models/stream.model';
 import { NewAiMessage } from '../models/new-message.model';
 import { AiModelData } from '../models/ai-model-data.model';
 import { ulid } from 'ulid';
 const genAICache = new Map<string, GoogleGenAI>();
-export class GeminiStrategy implements IAiChat {
+export class GeminiStrategy implements IAIChat {
   sendMessage(
     messages: NewAiMessage[],
     modelData: AiModelData,
