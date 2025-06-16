@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 import ChatMessage from '@/components/ChatMessage';
@@ -8,41 +7,49 @@ import LoginModal from '@/components/LoginModal';
 import ThemeToggle from '@/components/ThemeToggle';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { authApi } from '@/lib/api/auth';
+import { storage } from '@/lib/utils/storage';
+import { User } from '@/lib/types/api';
 
 interface Message {
-  id: string;
-  content: string;
-  sender: 'user' | 'ai';
-  timestamp: string;
-  attachments?: Array<{ type: 'image' | 'document' | 'link'; url: string; name: string }>;
+	id: string;
+	content: string;
+	sender: 'user' | 'ai';
+	timestamp: string;
+	attachments?: Array<{
+		type: 'image' | 'document' | 'link';
+		url: string;
+		name: string;
+	}>;
 }
 
 interface Chat {
-  id: string;
-  title: string;
-  timestamp: string;
-  messages: Message[];
+	id: string;
+	title: string;
+	timestamp: string;
+	messages: Message[];
 }
 
 const Index = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [chats, setChats] = useState<Chat[]>([
-    {
-      id: '1',
-      title: 'How does machine learning work?',
-      timestamp: '2 hours ago',
-      messages: [
-        {
-          id: 'msg-1',
-          content: 'How does machine learning work?',
-          sender: 'user',
-          timestamp: '2:30 PM'
-        },
-        {
-          id: 'msg-2',
-          content: `# Machine Learning Explained
+	const [isLoggedIn, setIsLoggedIn] = useState(false);
+	const [showLoginModal, setShowLoginModal] = useState(false);
+	const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+	const [currentUser, setCurrentUser] = useState<User | null>(null);
+	const [chats, setChats] = useState<Chat[]>([
+		{
+			id: '1',
+			title: 'How does machine learning work?',
+			timestamp: '2 hours ago',
+			messages: [
+				{
+					id: 'msg-1',
+					content: 'How does machine learning work?',
+					sender: 'user',
+					timestamp: '2:30 PM',
+				},
+				{
+					id: 'msg-2',
+					content: `# Machine Learning Explained
 
 Machine learning is a subset of **artificial intelligence** that enables computers to learn and make decisions from data without being explicitly programmed for every task.
 
@@ -80,25 +87,25 @@ predictions = model.predict(X_test)
 \`\`\`
 
 The key is that ML algorithms improve their performance as they are exposed to more data over time!`,
-          sender: 'ai',
-          timestamp: '2:31 PM'
-        }
-      ]
-    },
-    {
-      id: '2',
-      title: 'React best practices',
-      timestamp: '1 day ago',
-      messages: [
-        {
-          id: 'msg-3',
-          content: 'What are the best practices for React development?',
-          sender: 'user',
-          timestamp: '10:15 AM'
-        },
-        {
-          id: 'msg-4',
-          content: `# React Best Practices
+					sender: 'ai',
+					timestamp: '2:31 PM',
+				},
+			],
+		},
+		{
+			id: '2',
+			title: 'React best practices',
+			timestamp: '1 day ago',
+			messages: [
+				{
+					id: 'msg-3',
+					content: 'What are the best practices for React development?',
+					sender: 'user',
+					timestamp: '10:15 AM',
+				},
+				{
+					id: 'msg-4',
+					content: `# React Best Practices
 
 Here are the essential best practices for React development:
 
@@ -158,25 +165,26 @@ useEffect(() => {
 4. **Use ESLint and Prettier**
 
 These practices will help you build maintainable and performant React applications!`,
-          sender: 'ai',
-          timestamp: '10:16 AM'
-        }
-      ]
-    },
-    {
-      id: '3',
-      title: 'Python vs JavaScript',
-      timestamp: '3 days ago',
-      messages: [
-        {
-          id: 'msg-5',
-          content: 'What are the main differences between Python and JavaScript?',
-          sender: 'user',
-          timestamp: '3:45 PM'
-        },
-        {
-          id: 'msg-6',
-          content: `# Python vs JavaScript: Key Differences
+					sender: 'ai',
+					timestamp: '10:16 AM',
+				},
+			],
+		},
+		{
+			id: '3',
+			title: 'Python vs JavaScript',
+			timestamp: '3 days ago',
+			messages: [
+				{
+					id: 'msg-5',
+					content:
+						'What are the main differences between Python and JavaScript?',
+					sender: 'user',
+					timestamp: '3:45 PM',
+				},
+				{
+					id: 'msg-6',
+					content: `# Python vs JavaScript: Key Differences
 
 Both are popular programming languages, but they serve different purposes and have distinct characteristics.
 
@@ -228,114 +236,154 @@ const squares = Array.from({length: 10}, (_, i) => i**2);
 - **JavaScript**: Faster execution, especially with V8 engine
 
 Choose based on your project needs and career goals!`,
-          sender: 'ai',
-          timestamp: '3:47 PM'
-        }
-      ]
-    }
-  ]);
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+					sender: 'ai',
+					timestamp: '3:47 PM',
+				},
+			],
+		},
+	]);
+	const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+	const [isLoading, setIsLoading] = useState(false);
+	const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const currentChat = chats.find(chat => chat.id === currentChatId);
-  const messages = currentChat?.messages || [];
+	const currentChat = chats.find((chat) => chat.id === currentChatId);
+	const messages = currentChat?.messages || [];
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+	const scrollToBottom = () => {
+		messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+	};
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+	useEffect(() => {
+		scrollToBottom();
+	}, [messages]);
 
-  const handleNewChat = () => {
-    const newChatId = `chat-${Date.now()}`;
-    const newChat: Chat = {
-      id: newChatId,
-      title: 'New Chat',
-      timestamp: 'Just now',
-      messages: []
-    };
-    setChats(prev => [newChat, ...prev]);
-    setCurrentChatId(newChatId);
-  };
+	useEffect(() => {
+		// Check for existing session
+		const token = storage.getToken();
+		const user = storage.getUser();
+		if (token && user) {
+			setIsLoggedIn(true);
+			setCurrentUser(user);
+		}
+	}, []);
 
-  const handleChatSelect = (chatId: string) => {
-    setCurrentChatId(chatId);
-  };
+	const handleNewChat = () => {
+		const newChatId = `chat-${Date.now()}`;
+		const newChat: Chat = {
+			id: newChatId,
+			title: 'New Chat',
+			timestamp: 'Just now',
+			messages: [],
+		};
+		setChats((prev) => [newChat, ...prev]);
+		setCurrentChatId(newChatId);
+	};
 
-  const handleLogin = (email: string, password: string) => {
-    console.log('Login attempt:', email);
-    setIsLoggedIn(true);
-  };
+	const handleChatSelect = (chatId: string) => {
+		setCurrentChatId(chatId);
+	};
 
-  const handleQuestionSelect = (question: string) => {
-    if (!currentChatId) {
-      handleNewChat();
-    }
-    // Wait for next tick to ensure currentChatId is set
-    setTimeout(() => {
-      handleSendMessage(question);
-    }, 0);
-  };
+	const handleLogin = async (email: string, password: string) => {
+		try {
+			const response = await authApi.login({ email, password });
+			setIsLoggedIn(true);
+			setCurrentUser(response.currentUser);
+		} catch (error) {
+			console.error('Login failed:', error);
+		}
+	};
 
-  const handleSendMessage = async (content: string, attachments?: File[]) => {
-    if (!currentChatId) {
-      handleNewChat();
-      // Wait for the new chat to be created
-      setTimeout(() => {
-        handleSendMessage(content, attachments);
-      }, 0);
-      return;
-    }
+	const handleLogout = async () => {
+		try {
+			await authApi.logout();
+			setIsLoggedIn(false);
+			setCurrentUser(null);
+		} catch (error) {
+			console.error('Logout failed:', error);
+		}
+	};
 
-    const userMessage: Message = {
-      id: `msg-${Date.now()}`,
-      content,
-      sender: 'user',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      attachments: attachments?.map(file => ({
-        type: file.type.startsWith('image/') ? 'image' as const : 'document' as const,
-        url: URL.createObjectURL(file),
-        name: file.name
-      }))
-    };
+	const handleQuestionSelect = (question: string) => {
+		if (!currentChatId) {
+			handleNewChat();
+		}
+		// Wait for next tick to ensure currentChatId is set
+		setTimeout(() => {
+			handleSendMessage(question);
+		}, 0);
+	};
 
-    // Add user message
-    setChats(prev => prev.map(chat => 
-      chat.id === currentChatId 
-        ? { 
-            ...chat, 
-            messages: [...chat.messages, userMessage],
-            title: chat.messages.length === 0 ? content.slice(0, 50) + (content.length > 50 ? '...' : '') : chat.title
-          }
-        : chat
-    ));
+	const handleSendMessage = async (content: string, attachments?: File[]) => {
+		if (!currentChatId) {
+			handleNewChat();
+			// Wait for the new chat to be created
+			setTimeout(() => {
+				handleSendMessage(content, attachments);
+			}, 0);
+			return;
+		}
 
-    setIsLoading(true);
+		const userMessage: Message = {
+			id: `msg-${Date.now()}`,
+			content,
+			sender: 'user',
+			timestamp: new Date().toLocaleTimeString([], {
+				hour: '2-digit',
+				minute: '2-digit',
+			}),
+			attachments: attachments?.map((file) => ({
+				type: file.type.startsWith('image/')
+					? ('image' as const)
+					: ('document' as const),
+				url: URL.createObjectURL(file),
+				name: file.name,
+			})),
+		};
 
-    // Simulate AI response
-    setTimeout(() => {
-      const aiMessage: Message = {
-        id: `msg-${Date.now()}-ai`,
-        content: generateAIResponse(content),
-        sender: 'ai',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
+		// Add user message
+		setChats((prev) =>
+			prev.map((chat) =>
+				chat.id === currentChatId
+					? {
+							...chat,
+							messages: [...chat.messages, userMessage],
+							title:
+								chat.messages.length === 0
+									? content.slice(0, 50) + (content.length > 50 ? '...' : '')
+									: chat.title,
+					  }
+					: chat
+			)
+		);
 
-      setChats(prev => prev.map(chat => 
-        chat.id === currentChatId 
-          ? { ...chat, messages: [...chat.messages, aiMessage] }
-          : chat
-      ));
-      setIsLoading(false);
-    }, 1000 + Math.random() * 2000);
-  };
+		setIsLoading(true);
 
-  const generateAIResponse = (userMessage: string): string => {
-    const responses = {
-      'How does AI work?': `# How AI Works
+		// Simulate AI response
+		setTimeout(() => {
+			const aiMessage: Message = {
+				id: `msg-${Date.now()}-ai`,
+				content: generateAIResponse(content),
+				sender: 'ai',
+				timestamp: new Date().toLocaleTimeString([], {
+					hour: '2-digit',
+					minute: '2-digit',
+				}),
+			};
+
+			setChats((prev) =>
+				prev.map((chat) =>
+					chat.id === currentChatId
+						? { ...chat, messages: [...chat.messages, aiMessage] }
+						: chat
+				)
+			);
+			setIsLoading(false);
+		}, 1000 + Math.random() * 2000);
+	};
+
+	const generateAIResponse = (userMessage: string): string => {
+		const responses = {
+			'How does AI work?': `# How AI Works
 
 AI (Artificial Intelligence) works through several key mechanisms:
 
@@ -361,7 +409,7 @@ def predict(input_data, weights):
 
 The field continues to evolve rapidly with advances in **deep learning**, **transformer models**, and **large language models** like the one you're chatting with right now!`,
 
-      'Are black holes real?': `# Black Holes: Scientific Reality
+			'Are black holes real?': `# Black Holes: Scientific Reality
 
 Yes, **black holes are absolutely real**! They're among the most fascinating objects in the universe.
 
@@ -382,7 +430,7 @@ Black holes are regions of spacetime where gravity is so strong that nothing - n
 
 The physics of black holes has been confirmed through decades of observation and matches Einstein's predictions remarkably well!`,
 
-      'How many Rs are in the word "strawberry"?': `# Counting Rs in "Strawberry"
+			'How many Rs are in the word "strawberry"?': `# Counting Rs in "Strawberry"
 
 Let me count the letter "R" in the word **"strawberry"**:
 
@@ -397,7 +445,7 @@ Looking at each letter:
 
 This is actually a common example used to test attention to detail and careful letter-by-letter analysis!`,
 
-      'What is the meaning of life?': `# The Meaning of Life: Perspectives
+			'What is the meaning of life?': `# The Meaning of Life: Perspectives
 
 This is one of humanity's oldest and most profound questions. Different perspectives offer various answers:
 
@@ -423,65 +471,73 @@ Research suggests meaning often comes from:
 3. **Growth** and learning
 4. **Legacy** and positive impact
 
-Perhaps the beauty is that each person can discover their own answer to this timeless question. What gives *your* life meaning?`
-    };
+Perhaps the beauty is that each person can discover their own answer to this timeless question. What gives *your* life meaning?`,
+		};
 
-    return responses[userMessage as keyof typeof responses] || 
-      `Thank you for your question about "${userMessage}". I'd be happy to help you explore this topic further. Could you provide more specific details about what you'd like to know?`;
-  };
+		return (
+			responses[userMessage as keyof typeof responses] ||
+			`Thank you for your question about "${userMessage}". I'd be happy to help you explore this topic further. Could you provide more specific details about what you'd like to know?`
+		);
+	};
 
-  return (
-    <ThemeProvider defaultTheme="system" storageKey="t3-chat-theme">
-      <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-        <Sidebar
-          isCollapsed={sidebarCollapsed}
-          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          onNewChat={handleNewChat}
-          chats={chats}
-          onChatSelect={handleChatSelect}
-          selectedChatId={currentChatId}
-          isLoggedIn={isLoggedIn}
-          onLogin={() => setShowLoginModal(true)}
-        />
-        
-        <div className="flex-1 flex flex-col">
-          {messages.length === 0 && !currentChatId ? (
-            <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50 dark:from-gray-900 dark:to-gray-800">
-              <DefaultQuestions onQuestionSelect={handleQuestionSelect} />
-            </div>
-          ) : (
-            <ScrollArea className="flex-1 bg-white dark:bg-gray-900">
-              <div className="max-w-4xl mx-auto">
-                {messages.map((message) => (
-                  <ChatMessage key={message.id} message={message} />
-                ))}
-                {isLoading && (
-                  <div className="flex gap-4 p-6 bg-gray-50 dark:bg-gray-800">
-                    <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
-                      <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-medium text-sm text-gray-900 dark:text-gray-100 mb-2">Assistant</div>
-                      <div className="text-gray-600 dark:text-gray-400">Thinking...</div>
-                    </div>
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-            </ScrollArea>
-          )}
-          
-          <ChatInput onSendMessage={handleSendMessage} disabled={isLoading} />
-        </div>
+	return (
+		<ThemeProvider defaultTheme="system" storageKey="t3-chat-theme">
+			<div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+				<Sidebar
+					isCollapsed={sidebarCollapsed}
+					onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+					onNewChat={handleNewChat}
+					chats={chats}
+					onChatSelect={handleChatSelect}
+					selectedChatId={currentChatId}
+					isLoggedIn={isLoggedIn}
+					onLogin={() => setShowLoginModal(true)}
+					onLogout={handleLogout}
+					currentUser={currentUser}
+				/>
 
-        <LoginModal
-          isOpen={showLoginModal}
-          onClose={() => setShowLoginModal(false)}
-          onLogin={handleLogin}
-        />
-      </div>
-    </ThemeProvider>
-  );
+				<div className="flex-1 flex flex-col">
+					{messages.length === 0 && !currentChatId ? (
+						<div className="flex-1 flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50 dark:from-gray-900 dark:to-gray-800">
+							<DefaultQuestions onQuestionSelect={handleQuestionSelect} />
+						</div>
+					) : (
+						<ScrollArea className="flex-1 bg-white dark:bg-gray-900">
+							<div className="max-w-4xl mx-auto">
+								{messages.map((message) => (
+									<ChatMessage key={message.id} message={message} />
+								))}
+								{isLoading && (
+									<div className="flex gap-4 p-6 bg-gray-50 dark:bg-gray-800">
+										<div className="w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
+											<div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+										</div>
+										<div className="flex-1">
+											<div className="font-medium text-sm text-gray-900 dark:text-gray-100 mb-2">
+												Assistant
+											</div>
+											<div className="text-gray-600 dark:text-gray-400">
+												Thinking...
+											</div>
+										</div>
+									</div>
+								)}
+								<div ref={messagesEndRef} />
+							</div>
+						</ScrollArea>
+					)}
+
+					<ChatInput onSendMessage={handleSendMessage} disabled={isLoading} />
+				</div>
+
+				<LoginModal
+					isOpen={showLoginModal}
+					onClose={() => setShowLoginModal(false)}
+					onLogin={handleLogin}
+				/>
+			</div>
+		</ThemeProvider>
+	);
 };
 
 export default Index;
