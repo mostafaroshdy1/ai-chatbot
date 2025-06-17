@@ -242,6 +242,9 @@ export class ChatService {
 
   async createShareableChat(chatId: string) {
     const chat = await this.chatRepository.getChatById(chatId);
+    if (!chat) {
+      throw new BadRequestException(ChatError.ChatNotFound);
+    }
     const { id: currentUserId } = this.localStorageService.getCurrentUser();
 
     if (currentUserId !== chat.userId) {
