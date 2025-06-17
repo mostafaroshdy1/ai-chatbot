@@ -230,9 +230,21 @@ export class ChatService {
     };
   }
 
-  getChatMessages(chatId: string) {
+  async getChatMessages(chatId: string) {
     const { id: userId } = this.localStorageService.getCurrentUser();
-    return this.chatRepository.getChatMessages(chatId, userId);
+    const chat = await this.chatRepository.getChatById(chatId);
+
+    if (chat.userId !== userId) {
+      throw new ForbiddenException(ChatError.ChatNotBelongToUser);
+    }
+
+    if (!chat) {
+      throw new BadRequestException(ChatError.ChatNotFound);
+    }
+
+    const messages = await this.chatRepository.getChatMessages(chatId, userId);
+
+    return messages;
   }
 
   getAllChats(data: { offset: number; limit: number }) {
