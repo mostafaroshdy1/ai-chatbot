@@ -26,6 +26,7 @@ import {
 import { AiModelsService } from 'src/ai-models/ai-models.service';
 import { AiModel } from './strategies/models/ai-models';
 import { RedisService } from 'src/cache/redis.service';
+import { ChatSharesRepository } from './repository/chat-shares.repository';
 
 @Injectable()
 export class ChatService {
@@ -35,6 +36,7 @@ export class ChatService {
     private readonly aiStrategyFactory: AiStrategyFactory,
     private readonly aiModelsService: AiModelsService,
     private readonly redisService: RedisService,
+    private readonly chatSharesRepository: ChatSharesRepository,
   ) {}
 
   private logger = new Logger(ChatService.name);
@@ -236,5 +238,40 @@ export class ChatService {
   getAllChats(data: { offset: number; limit: number }) {
     const { id: userId } = this.localStorageService.getCurrentUser();
     return this.chatRepository.getAllChats(userId, data);
+  }
+
+  async createShareableChat(chatId: string) {
+    const chat = await this.chatRepository.getChatById(chatId);
+    const { id: currentUserId } = this.localStorageService.getCurrentUser();
+
+    if (currentUserId !== chat.userId) {
+      throw new ForbiddenException(ChatError.ChatNotBelongToUser);
+    }
+
+    const sharedChatId =
+      await this.chatSharesRepository.getSharedChatByChatId(chatId);
+
+    if (sharedChatId) {
+      await this.chatSharesRepository.updateSharedChat(sharedChatId);
+      return sharedChatId;
+    }
+
+    return this.chatSharesRepository.createSharedChat(chatId);
+  }
+
+  async getSharedChatById(sharedChatId: string) {
+    const chat =
+      await this.chatSharesRepository.getSharedChatById(sharedChatId);
+    if (!chat) {
+      throw new BadRequestException(ChatError.SharedChatNotFound);
+    }
+    return chat;
+  }
+
+  async getIsChatShared(chatId: string) {
+    const sharedChatId =
+      await this.chatSharesRepository.getSharedChatByChatId(chatId);
+
+    return sharedChatId;
   }
 }

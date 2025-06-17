@@ -6,4 +6,5 @@ export enum ChatError {
   ErrorUpdatingChatLabel = 'Error updating chat label',
   AiModelNotAvailable = 'AI model not available',
   ErrorPublishingMessage = 'Error publishing message to chat',
+  SharedChatNotFound = 'Shared chat not found',
 }
