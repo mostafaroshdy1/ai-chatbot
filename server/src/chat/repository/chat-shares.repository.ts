@@ -26,7 +26,6 @@ export class ChatSharesRepository {
   async getSharedChatById(sharedChatId: string) {
     const chat = await this.repository
       .select({
-        chatId: chatShares.id,
         createdAt: chats.createdAt,
         messageContent: chatMessages.content,
         messageRole: chatMessages.role,
