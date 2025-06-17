@@ -104,7 +104,6 @@ axiosInstance.interceptors.response.use(
 				processQueue(refreshError);
 				// Clear storage and redirect to login
 				storage.clear();
-				window.location.href = '/login';
 				return Promise.reject(refreshError);
 			} finally {
 				isRefreshing = false;

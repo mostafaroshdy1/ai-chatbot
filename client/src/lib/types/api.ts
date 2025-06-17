@@ -20,3 +20,15 @@ export interface RegisterCredentials extends LoginCredentials {
 	firstName: string;
 	lastName: string;
 }
+
+export interface Message {
+	id: string;
+	content: string;
+	sender: 'user' | 'ai';
+	timestamp: string;
+	attachments?: Array<{
+		type: 'image' | 'document' | 'link';
+		url: string;
+		name: string;
+	}>;
+}
