@@ -267,4 +267,11 @@ export class ChatService {
     }
     return chat;
   }
+
+  async getIsChatShared(chatId: string) {
+    const sharedChatId =
+      await this.chatSharesRepository.getSharedChatByChatId(chatId);
+
+    return sharedChatId;
+  }
 }
