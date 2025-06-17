@@ -6,11 +6,17 @@ import { ChatRepository } from './repository/chat.repository';
 import { AiStrategyFactory } from './strategies/ai-strategy.factory';
 import { AiModelsModule } from 'src/ai-models/ai-models.module';
 import { CacheModule } from 'src/cache/cache.module';
+import { ChatSharesRepository } from './repository/chat-shares.repository';
 
 @Module({
   controllers: [ChatController],
   imports: [UserModule, AiModelsModule, CacheModule],
-  providers: [ChatService, ChatRepository, AiStrategyFactory],
+  providers: [
+    ChatService,
+    ChatRepository,
+    AiStrategyFactory,
+    ChatSharesRepository,
+  ],
   exports: [ChatService],
 })
 export class AIChatModule {}

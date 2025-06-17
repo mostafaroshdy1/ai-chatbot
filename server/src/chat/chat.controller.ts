@@ -21,6 +21,7 @@ import { PromptDto } from './dto/prompt.dto';
 import { Observable } from 'rxjs';
 import { ChatMessageDto } from './dto/chat-messages.dto';
 import { ChatDto } from './dto/chat.dto';
+import { SharedChatDto } from './dto/shared-chat.dto';
 @UseGuards(AccessTokenGuard)
 @Controller('chat')
 export class ChatController {
@@ -33,7 +34,6 @@ export class ChatController {
     return plainToInstance(CreateChatDto, chats);
   }
 
-  // creates a new chat
   @HttpCode(HttpStatus.CREATED)
   @Post()
   async createChat(): Promise<CreateChatDto> {
@@ -70,5 +70,25 @@ export class ChatController {
   ): Promise<ChatMessageDto[]> {
     const messages = await this.aiChatService.getChatMessages(chatId);
     return plainToInstance(ChatMessageDto, messages);
+  }
+
+  @HttpCode(HttpStatus.CREATED)
+  @Post('share/:chatId')
+  async shareChat(
+    @Param('chatId', ParseUUIDPipe) chatId: string,
+  ): Promise<SharedChatDto> {
+    const sharedChat = await this.aiChatService.createShareableChat(chatId);
+
+    return plainToInstance(SharedChatDto, {
+      sharedChatId: sharedChat,
+    });
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Get('share/:sharedChatId')
+  async getSharedChatById(
+    @Param('sharedChatId', ParseUUIDPipe) chatId: string,
+  ) {
+    return this.aiChatService.getSharedChatById(chatId);
   }
 }
