@@ -11,4 +11,7 @@ RUN npm run build
 
 EXPOSE 4444
 
-CMD ["node", "dist/src/main"]
+COPY wait-for-it.sh .
+RUN chmod +x wait-for-it.sh
+
+CMD ["sh", "-c", "./wait-for-it.sh postgres:5432 -- npx drizzle-kit migrate && node dist/src/main"]
