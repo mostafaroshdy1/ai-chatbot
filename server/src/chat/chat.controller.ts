@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -52,6 +53,12 @@ export class ChatController {
       data.prompt,
       data.aiModelId,
     );
+  }
+
+  @Delete(':chatId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteChat(@Param('chatId', ParseUUIDPipe) chatId: string) {
+    await this.aiChatService.deleteChat(chatId);
   }
 
   @HttpCode(HttpStatus.OK)

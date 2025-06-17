@@ -274,4 +274,19 @@ export class ChatService {
 
     return sharedChatId;
   }
+
+  async deleteChat(chatId: string) {
+    const { id: userId } = this.localStorageService.getCurrentUser();
+    const chat = await this.chatRepository.getChatById(chatId);
+
+    if (!chat) {
+      throw new BadRequestException(ChatError.ChatNotFound);
+    }
+
+    if (chat.userId !== userId) {
+      throw new ForbiddenException(ChatError.ChatNotBelongToUser);
+    }
+
+    await this.chatRepository.deleteChat(chatId);
+  }
 }

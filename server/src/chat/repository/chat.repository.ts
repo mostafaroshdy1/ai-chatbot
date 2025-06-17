@@ -34,6 +34,10 @@ export class ChatRepository {
     return chat;
   }
 
+  deleteChat(chatId: string) {
+    return this.repository.delete(chats).where(eq(chats.id, chatId));
+  }
+
   async addMessageToChat(data: {
     chatId: string;
     userId: number;
