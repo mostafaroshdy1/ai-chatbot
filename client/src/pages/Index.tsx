@@ -13,6 +13,7 @@ import { storage } from '@/lib/utils/storage';
 import { User } from '@/lib/types/api';
 import { aiApi } from '@/lib/api/ai';
 import { toast } from '@/components/ui/use-toast';
+import { useNavigate, useParams } from 'react-router-dom';
 
 interface Message {
 	id: string;
@@ -33,8 +34,13 @@ const Index = () => {
 	const [currentUser, setCurrentUser] = useState<User | null>(null);
 	const [currentChatId, setCurrentChatId] = useState<string | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
+	const [streamingResponse, setStreamingResponse] = useState('');
+	const [displayedResponse, setDisplayedResponse] = useState('');
+	const [isStreaming, setIsStreaming] = useState(false);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 	const sidebarRef = useRef<HTMLDivElement>(null);
+	const navigate = useNavigate();
+	const { chatId: urlChatId } = useParams();
 
 	// Fetch chats with infinite scroll
 	const {
@@ -79,6 +85,17 @@ const Index = () => {
 				}),
 			})) || [];
 
+	// Append streaming message if streaming
+	const allMessages = [...messages];
+	if (isStreaming && displayedResponse) {
+		allMessages.push({
+			id: 'streaming',
+			content: displayedResponse,
+			sender: 'ai',
+			timestamp: new Date().toLocaleTimeString(),
+		});
+	}
+
 	const scrollToBottom = () => {
 		messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
 	};
@@ -97,6 +114,13 @@ const Index = () => {
 		}
 	}, []);
 
+	// Sync currentChatId with URL
+	useEffect(() => {
+		if (urlChatId && urlChatId !== currentChatId) {
+			setCurrentChatId(urlChatId);
+		}
+	}, [urlChatId]);
+
 	// Handle sidebar scroll for infinite loading
 	const handleSidebarScroll = (e: React.UIEvent<HTMLDivElement>) => {
 		const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
@@ -113,6 +137,7 @@ const Index = () => {
 		try {
 			const response = await aiApi.createChat();
 			setCurrentChatId(response.chatId);
+			navigate(`/${response.chatId}`);
 		} catch (error) {
 			console.error('Failed to create new chat:', error);
 			toast({
@@ -125,6 +150,7 @@ const Index = () => {
 
 	const handleChatSelect = (chatId: string) => {
 		setCurrentChatId(chatId);
+		navigate(`/${chatId}`);
 	};
 
 	const handleLogin = async (email: string, password: string) => {
@@ -201,63 +227,33 @@ const Index = () => {
 					}))}
 					onChatSelect={handleChatSelect}
 					selectedChatId={currentChatId}
+					ref={sidebarRef}
+					onScroll={handleSidebarScroll}
 					isLoggedIn={isLoggedIn}
 					onLogin={() => setShowLoginModal(true)}
 					onLogout={handleLogout}
 					currentUser={currentUser}
-					onScroll={handleSidebarScroll}
-					ref={sidebarRef}
 				/>
-
-				<div className="flex-1 flex flex-col">
-					{messages.length === 0 && !currentChatId ? (
-						<div className="flex-1 flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50 dark:from-gray-900 dark:to-gray-800">
-							<DefaultQuestions onQuestionSelect={handleQuestionSelect} />
-						</div>
-					) : (
-						<ScrollArea className="flex-1 bg-white dark:bg-gray-900">
-							<div className="max-w-4xl mx-auto">
-								{isLoadingMessages && (
-									<div className="flex justify-center p-4">
-										<div className="w-6 h-6 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
-									</div>
-								)}
-								{messages.map((message) => (
-									<ChatMessage key={message.id} message={message} />
-								))}
-								{isLoading && (
-									<div className="flex gap-4 p-6 bg-gray-50 dark:bg-gray-800">
-										<div className="w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
-											<div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
-										</div>
-										<div className="flex-1">
-											<div className="font-medium text-sm text-gray-900 dark:text-gray-100 mb-2">
-												Assistant
-											</div>
-											<div className="text-gray-600 dark:text-gray-400">
-												Thinking...
-											</div>
-										</div>
-									</div>
-								)}
-								<div ref={messagesEndRef} />
-							</div>
+				<div className="flex flex-col flex-1 h-full">
+					<div className="flex-1 overflow-y-auto">
+						<ScrollArea className="h-full px-4 py-6">
+							{allMessages.map((msg) => (
+								<ChatMessage key={msg.id} message={msg} />
+							))}
+							<div ref={messagesEndRef} />
 						</ScrollArea>
-					)}
-
+					</div>
 					<ChatInput
-						disabled={isLoading}
 						onChatCreated={(chatId, label) => {
 							setCurrentChatId(chatId);
+							navigate(`/${chatId}`);
 						}}
+						disabled={!isLoggedIn}
+						onStreamingResponse={setStreamingResponse}
+						onDisplayedResponse={setDisplayedResponse}
+						onStreamingStatus={setIsStreaming}
 					/>
 				</div>
-
-				<LoginModal
-					isOpen={showLoginModal}
-					onClose={() => setShowLoginModal(false)}
-					onLogin={handleLogin}
-				/>
 			</div>
 		</ThemeProvider>
 	);

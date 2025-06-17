@@ -76,17 +76,18 @@ export const useSSE = ({ onMessage, onComplete, onError }: UseSSEOptions) => {
 						},
 						onmessage(event) {
 							try {
-								const message: SSEMessage = JSON.parse(event.data);
-								console.log('[SSE] Message received:', message);
+								if (event.data) {
+									const message: SSEMessage = JSON.parse(event.data);
 
-								if (message.text) {
-									onMessage(message.text);
-								}
+									if (message.text) {
+										onMessage(message.text);
+									}
 
-								if (message.isFinal) {
-									console.log('[SSE] Stream complete, closing connection');
-									controller.current?.abort();
-									onComplete();
+									if (message.isFinal) {
+										console.log('[SSE] Stream complete, closing connection');
+										controller.current?.abort();
+										onComplete();
+									}
 								}
 							} catch (err) {
 								console.error('[SSE] Failed to parse message:', err);

@@ -23,6 +23,7 @@ export interface Model {
 	maxInputToken: number;
 	providerName: string;
 	providerId: number;
+	isDefault: boolean;
 }
 
 export const aiApi = {

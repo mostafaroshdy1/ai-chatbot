@@ -13,46 +13,62 @@ import { aiApi, Model } from '@/lib/api/ai';
 import { useToast } from '@/components/ui/use-toast';
 import { useSSE } from '@/lib/hooks/useSSE';
 import ChatMessage from './ChatMessage';
+import { useParams } from 'react-router-dom';
 
 interface ChatInputProps {
 	onChatCreated?: (chatId: string, label: string) => void;
 	disabled?: boolean;
+	onStreamingResponse: (response: string) => void;
+	onDisplayedResponse: (response: string) => void;
+	onStreamingStatus: (isStreaming: boolean) => void;
 }
 
 const ChatInput: React.FC<ChatInputProps> = ({
 	onChatCreated,
 	disabled = false,
+	onStreamingResponse,
+	onDisplayedResponse,
+	onStreamingStatus,
 }) => {
+	const { chatId: urlChatId } = useParams();
 	const [message, setMessage] = useState('');
 	const [models, setModels] = useState<Model[]>([]);
 	const [selectedModel, setSelectedModel] = useState<string>('');
 	const [isLoadingModels, setIsLoadingModels] = useState(true);
 	const [isSending, setIsSending] = useState(false);
 	const [attachments, setAttachments] = useState<File[]>([]);
-	const [currentChatId, setCurrentChatId] = useState<string | null>(null);
-	const [streamingResponse, setStreamingResponse] = useState('');
-	const [displayedResponse, setDisplayedResponse] = useState('');
+	const [currentChatId, setCurrentChatId] = useState<string | null>(
+		urlChatId || null
+	);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const { toast } = useToast();
+	const [localStreamingResponse, setLocalStreamingResponse] = useState('');
 
-	// Typewriter effect
 	useEffect(() => {
-		if (streamingResponse) {
+		setLocalStreamingResponse('');
+	}, [disabled]);
+
+	useEffect(() => {
+		if (localStreamingResponse) {
 			const timeout = setTimeout(() => {
-				setDisplayedResponse(streamingResponse);
+				onDisplayedResponse?.(localStreamingResponse);
 			}, 50);
 			return () => clearTimeout(timeout);
 		}
-	}, [streamingResponse]);
+	}, [localStreamingResponse, onDisplayedResponse]);
 
 	const { connect } = useSSE({
 		onMessage: (chunk) => {
-			setStreamingResponse((prev) => prev + chunk);
+			onStreamingStatus?.(true);
+			setLocalStreamingResponse((prev) => {
+				const updated = prev + chunk;
+				onStreamingResponse?.(updated);
+				return updated;
+			});
 		},
 		onComplete: () => {
 			setIsSending(false);
-			setStreamingResponse('');
-			setDisplayedResponse('');
+			onStreamingStatus?.(false);
 		},
 		onError: (err) => {
 			if (err.message === 'Max retry attempts reached') {
@@ -63,8 +79,24 @@ const ChatInput: React.FC<ChatInputProps> = ({
 				});
 			}
 			setIsSending(false);
+			onStreamingStatus?.(false);
+			setLocalStreamingResponse('');
+			onStreamingResponse?.('');
+			onDisplayedResponse?.('');
 		},
 	});
+
+	// Update selected model when models change
+	useEffect(() => {
+		if (models.length > 0 && !selectedModel) {
+			const defaultModel = models.find((model) => model.isDefault);
+			if (defaultModel) {
+				setSelectedModel(defaultModel.name);
+			} else {
+				setSelectedModel(models[0].name);
+			}
+		}
+	}, [models, selectedModel]);
 
 	useEffect(() => {
 		const fetchModels = async () => {
@@ -72,9 +104,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
 				const response = await aiApi.getModels();
 				if (response) {
 					setModels(response);
-					if (response.length > 0) {
-						setSelectedModel(response[0].name);
-					}
 				}
 			} catch (error) {
 				toast({
@@ -89,6 +118,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
 		fetchModels();
 	}, [toast]);
+
+	// Sync currentChatId with URL
+	useEffect(() => {
+		if (urlChatId && urlChatId !== currentChatId) {
+			setCurrentChatId(urlChatId);
+		}
+	}, [urlChatId]);
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -105,6 +141,10 @@ const ChatInput: React.FC<ChatInputProps> = ({
 		if (isSending) return;
 
 		setIsSending(true);
+		setLocalStreamingResponse('');
+		onStreamingResponse?.('');
+		onDisplayedResponse?.('');
+
 		try {
 			let chatId = currentChatId;
 
@@ -143,8 +183,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
 					error instanceof Error ? error.message : 'Failed to send message',
 				variant: 'destructive',
 			});
-		} finally {
 			setIsSending(false);
+			onStreamingStatus?.(false);
+			setLocalStreamingResponse('');
+			onStreamingResponse?.('');
+			onDisplayedResponse?.('');
 		}
 	};
 
@@ -201,7 +244,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
 						<SelectTrigger className="w-48 h-8 text-sm border-none bg-transparent shadow-none focus:ring-0">
 							<SelectValue
 								placeholder={
-									isLoadingModels ? 'Loading models...' : 'Select a model'
+									isLoadingModels ? 'Loading models...' : selectedModel
 								}
 							/>
 						</SelectTrigger>
@@ -291,21 +334,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
 				onChange={handleFileSelect}
 				className="hidden"
 			/>
-
-			{/* Streaming Response */}
-			{displayedResponse && (
-				<ChatMessage
-					message={{
-						id: 'streaming-response',
-						content: displayedResponse,
-						sender: 'ai',
-						timestamp: new Date().toLocaleTimeString([], {
-							hour: '2-digit',
-							minute: '2-digit',
-						}),
-					}}
-				/>
-			)}
 
 			{/* Footer */}
 			<div className="mt-4 text-center text-xs text-gray-500 dark:text-gray-400">
