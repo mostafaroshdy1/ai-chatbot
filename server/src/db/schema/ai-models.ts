@@ -11,4 +11,5 @@ export const aiModels = pgTable('ai_models', {
   name: t.varchar().notNull().unique(),
   maxInputToken: t.integer().notNull(),
   createdAt: t.timestamp().notNull().defaultNow(),
+  isDefault: t.boolean().notNull().default(false),
 });

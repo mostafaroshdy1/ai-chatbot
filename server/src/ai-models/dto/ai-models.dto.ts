@@ -11,4 +11,6 @@ export class AiModelsDto {
   providerName: string;
   @Expose()
   providerId: number;
+  @Expose()
+  isDefault: boolean;
 }

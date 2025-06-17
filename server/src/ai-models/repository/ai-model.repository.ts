@@ -31,6 +31,7 @@ export class AiModelRepository {
         maxInputToken: aiModels.maxInputToken,
         providerName: aiModelProviders.name,
         providerId: aiModelProviders.id,
+        isDefault: aiModels.isDefault,
       })
       .from(aiModels)
       .innerJoin(

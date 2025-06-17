@@ -1,0 +1,1 @@
+ALTER TABLE "ai_models" ADD COLUMN "isDefault" boolean DEFAULT false NOT NULL;
