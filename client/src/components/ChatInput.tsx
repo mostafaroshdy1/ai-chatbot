@@ -14,21 +14,39 @@ import { useToast } from '@/components/ui/use-toast';
 import { useSSE } from '@/lib/hooks/useSSE';
 import ChatMessage from './ChatMessage';
 import { useParams } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import { Message } from '@/lib/types/api';
 
 interface ChatInputProps {
-	onChatCreated?: (chatId: string, label: string) => void;
+	currentChatId: string | null;
+	isTempChat: boolean;
+	onFirstMessage: (oldId: string, newId: string, label: string) => void;
+	addMessage: (chatId: string, msg: Message) => void;
+	updateMessage: (
+		chatId: string,
+		messageId: string,
+		newContent: string
+	) => void;
 	disabled?: boolean;
-	onStreamingResponse: (response: string) => void;
-	onDisplayedResponse: (response: string) => void;
-	onStreamingStatus: (isStreaming: boolean) => void;
+	onStreamingResponse?: (response: string) => void;
+	onDisplayedResponse?: (response: string) => void;
+	onStreamingStatus?: (isStreaming: boolean) => void;
+	selectedQuestion?: string;
+	onQuestionProcessed?: () => void;
 }
 
 const ChatInput: React.FC<ChatInputProps> = ({
-	onChatCreated,
+	currentChatId,
+	isTempChat,
+	onFirstMessage,
+	addMessage,
+	updateMessage,
 	disabled = false,
 	onStreamingResponse,
 	onDisplayedResponse,
 	onStreamingStatus,
+	selectedQuestion,
+	onQuestionProcessed,
 }) => {
 	const { chatId: urlChatId } = useParams();
 	const [message, setMessage] = useState('');
@@ -37,38 +55,72 @@ const ChatInput: React.FC<ChatInputProps> = ({
 	const [isLoadingModels, setIsLoadingModels] = useState(true);
 	const [isSending, setIsSending] = useState(false);
 	const [attachments, setAttachments] = useState<File[]>([]);
-	const [currentChatId, setCurrentChatId] = useState<string | null>(
-		urlChatId || null
-	);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const { toast } = useToast();
 	const [localStreamingResponse, setLocalStreamingResponse] = useState('');
+	const streamingResponseRef = useRef('');
+	const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const currentChatIdRef = useRef<string | null>(null);
+	const aiMessageIdRef = useRef<string | null>(null);
 
-	useEffect(() => {
-		setLocalStreamingResponse('');
-	}, [disabled]);
-
-	useEffect(() => {
-		if (localStreamingResponse) {
-			const timeout = setTimeout(() => {
-				onDisplayedResponse?.(localStreamingResponse);
-			}, 50);
-			return () => clearTimeout(timeout);
-		}
-	}, [localStreamingResponse, onDisplayedResponse]);
-
-	const { connect } = useSSE({
+	const { connect, disconnect } = useSSE({
 		onMessage: (chunk) => {
 			onStreamingStatus?.(true);
+
+			// If this is the first chunk, create the AI message
+			if (!aiMessageIdRef.current) {
+				const chatIdToUse = currentChatIdRef.current || currentChatId;
+				if (chatIdToUse) {
+					const aiMsg: Message = {
+						id: Date.now().toString(),
+						content: '',
+						sender: 'ai',
+						timestamp: new Date().toLocaleTimeString(),
+					};
+					aiMessageIdRef.current = aiMsg.id;
+					addMessage(chatIdToUse, aiMsg);
+				}
+			}
+
 			setLocalStreamingResponse((prev) => {
 				const updated = prev + chunk;
+				streamingResponseRef.current = updated; // Store in ref
 				onStreamingResponse?.(updated);
+
+				// Update the AI message content as it streams
+				if (aiMessageIdRef.current) {
+					const chatIdToUse = currentChatIdRef.current || currentChatId;
+					if (chatIdToUse) {
+						updateMessage(chatIdToUse, aiMessageIdRef.current, updated);
+					}
+				}
+
 				return updated;
 			});
 		},
 		onComplete: () => {
+			// Clear timeouts since SSE completed successfully
+			if (timeoutRef.current) {
+				clearTimeout(timeoutRef.current);
+				timeoutRef.current = null;
+			}
+			if (fallbackTimeoutRef.current) {
+				clearTimeout(fallbackTimeoutRef.current);
+				fallbackTimeoutRef.current = null;
+			}
+
 			setIsSending(false);
 			onStreamingStatus?.(false);
+
+			// Clear streaming response after completion
+			setLocalStreamingResponse('');
+			streamingResponseRef.current = '';
+			onStreamingResponse?.('');
+			onDisplayedResponse?.('');
+
+			// Reset AI message ID for next conversation
+			aiMessageIdRef.current = null;
 		},
 		onError: (err) => {
 			if (err.message === 'Max retry attempts reached') {
@@ -83,8 +135,57 @@ const ChatInput: React.FC<ChatInputProps> = ({
 			setLocalStreamingResponse('');
 			onStreamingResponse?.('');
 			onDisplayedResponse?.('');
+
+			// Reset AI message ID on error
+			aiMessageIdRef.current = null;
 		},
 	});
+
+	useEffect(() => {
+		setLocalStreamingResponse('');
+	}, [disabled]);
+
+	// Cleanup SSE connection when chat changes
+	useEffect(() => {
+		return () => {
+			disconnect();
+		};
+	}, [currentChatId, disconnect]);
+
+	// Cleanup timeouts on unmount
+	useEffect(() => {
+		return () => {
+			if (timeoutRef.current) {
+				clearTimeout(timeoutRef.current);
+			}
+			if (fallbackTimeoutRef.current) {
+				clearTimeout(fallbackTimeoutRef.current);
+			}
+		};
+	}, []);
+
+	// Handle selected question from DefaultQuestions
+	useEffect(() => {
+		if (selectedQuestion && selectedQuestion.trim()) {
+			setMessage(selectedQuestion);
+			// Auto-submit the question after a short delay to ensure chat is ready
+			const timer = setTimeout(() => {
+				// Call submit logic directly
+				handleSubmitDirectly(selectedQuestion);
+				onQuestionProcessed?.();
+			}, 100);
+			return () => clearTimeout(timer);
+		}
+	}, [selectedQuestion, onQuestionProcessed]);
+
+	useEffect(() => {
+		if (localStreamingResponse) {
+			const timeout = setTimeout(() => {
+				onDisplayedResponse?.(localStreamingResponse);
+			}, 50);
+			return () => clearTimeout(timeout);
+		}
+	}, [localStreamingResponse, onDisplayedResponse]);
 
 	// Update selected model when models change
 	useEffect(() => {
@@ -119,13 +220,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
 		fetchModels();
 	}, [toast]);
 
-	// Sync currentChatId with URL
-	useEffect(() => {
-		if (urlChatId && urlChatId !== currentChatId) {
-			setCurrentChatId(urlChatId);
-		}
-	}, [urlChatId]);
-
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (!selectedModel) {
@@ -145,17 +239,28 @@ const ChatInput: React.FC<ChatInputProps> = ({
 		onStreamingResponse?.('');
 		onDisplayedResponse?.('');
 
+		// Reset AI message ID for new conversation
+		aiMessageIdRef.current = null;
+
 		try {
 			let chatId = currentChatId;
 
-			// If no chat exists, create one
-			if (!chatId) {
+			// If no chat exists or is temp, create one
+			if (!chatId || isTempChat) {
 				const chatResponse = await aiApi.createChat();
 				chatId = chatResponse.chatId;
-				setCurrentChatId(chatId);
-				// Wait a bit for the chat to be fully created
+				onFirstMessage?.(currentChatId || '', chatId, chatResponse.label);
 				await new Promise((resolve) => setTimeout(resolve, 100));
 			}
+
+			// Add user message to memory
+			const userMsg: Message = {
+				id: Date.now().toString(),
+				content: message,
+				sender: 'user',
+				timestamp: new Date().toLocaleTimeString(),
+			};
+			addMessage(chatId, userMsg);
 
 			// Send the message
 			const selectedModelData = models.find((m) => m.name === selectedModel);
@@ -168,10 +273,173 @@ const ChatInput: React.FC<ChatInputProps> = ({
 			);
 
 			if (messageResponse.success) {
-				onChatCreated?.(chatId, messageResponse.chatLabel);
-				connect(chatId);
+				// Update chat label if provided
+				if (messageResponse.chatLabel) {
+					onFirstMessage?.(chatId, chatId, messageResponse.chatLabel);
+				}
+
 				setMessage('');
 				setAttachments([]);
+
+				// Store the chatId that will be used for SSE
+				currentChatIdRef.current = chatId;
+
+				// Connect to SSE stream after sending message
+				connect(chatId);
+
+				// Add a timeout to ensure message is added even if SSE fails
+				timeoutRef.current = setTimeout(() => {
+					if (isSending && streamingResponseRef.current.trim()) {
+						const aiMsg: Message = {
+							id: Date.now().toString(),
+							content: streamingResponseRef.current,
+							sender: 'ai',
+							timestamp: new Date().toLocaleTimeString(),
+						};
+						addMessage(currentChatIdRef.current || chatId, aiMsg);
+						setIsSending(false);
+						onStreamingStatus?.(false);
+						setLocalStreamingResponse('');
+						streamingResponseRef.current = '';
+						onStreamingResponse?.('');
+						onDisplayedResponse?.('');
+					}
+				}, 5000); // 5 second timeout
+
+				// Fallback: if no SSE response after 10 seconds, add a placeholder message
+				fallbackTimeoutRef.current = setTimeout(() => {
+					if (isSending && !streamingResponseRef.current.trim()) {
+						const fallbackMsg: Message = {
+							id: Date.now().toString(),
+							content:
+								'Response received. Please check the chat for the full message.',
+							sender: 'ai',
+							timestamp: new Date().toLocaleTimeString(),
+						};
+						addMessage(currentChatIdRef.current || chatId, fallbackMsg);
+						setIsSending(false);
+						onStreamingStatus?.(false);
+					}
+				}, 10000);
+			} else {
+				throw new Error('Failed to send message');
+			}
+		} catch (error) {
+			console.error('Error sending message:', error);
+			toast({
+				title: 'Error',
+				description:
+					error instanceof Error ? error.message : 'Failed to send message',
+				variant: 'destructive',
+			});
+			setIsSending(false);
+			onStreamingStatus?.(false);
+			setLocalStreamingResponse('');
+			onStreamingResponse?.('');
+			onDisplayedResponse?.('');
+		}
+	};
+
+	const handleSubmitDirectly = async (question: string) => {
+		if (!selectedModel) {
+			toast({
+				title: 'Error',
+				description: 'Please select a model before sending a message',
+				variant: 'destructive',
+			});
+			return;
+		}
+
+		if (!question.trim() && attachments.length === 0) return;
+		if (isSending) return;
+
+		setIsSending(true);
+		setLocalStreamingResponse('');
+		onStreamingResponse?.('');
+		onDisplayedResponse?.('');
+
+		// Reset AI message ID for new conversation
+		aiMessageIdRef.current = null;
+
+		try {
+			let chatId = currentChatId;
+
+			// If no chat exists or is temp, create one
+			if (!chatId || isTempChat) {
+				const chatResponse = await aiApi.createChat();
+				chatId = chatResponse.chatId;
+				onFirstMessage?.(currentChatId || '', chatId, chatResponse.label);
+				await new Promise((resolve) => setTimeout(resolve, 100));
+			}
+
+			// Add user message to memory
+			const userMsg: Message = {
+				id: Date.now().toString(),
+				content: question,
+				sender: 'user',
+				timestamp: new Date().toLocaleTimeString(),
+			};
+			addMessage(chatId, userMsg);
+
+			// Send the message
+			const selectedModelData = models.find((m) => m.name === selectedModel);
+			if (!selectedModelData) throw new Error('Selected model not found');
+
+			const messageResponse = await aiApi.sendMessage(
+				chatId,
+				question,
+				selectedModelData.id
+			);
+
+			if (messageResponse.success) {
+				// Update chat label if provided
+				if (messageResponse.chatLabel) {
+					onFirstMessage?.(chatId, chatId, messageResponse.chatLabel);
+				}
+
+				setMessage('');
+				setAttachments([]);
+
+				// Store the chatId that will be used for SSE
+				currentChatIdRef.current = chatId;
+
+				// Connect to SSE stream after sending message
+				connect(chatId);
+
+				// Add a timeout to ensure message is added even if SSE fails
+				timeoutRef.current = setTimeout(() => {
+					if (isSending && streamingResponseRef.current.trim()) {
+						const aiMsg: Message = {
+							id: Date.now().toString(),
+							content: streamingResponseRef.current,
+							sender: 'ai',
+							timestamp: new Date().toLocaleTimeString(),
+						};
+						addMessage(currentChatIdRef.current || chatId, aiMsg);
+						setIsSending(false);
+						onStreamingStatus?.(false);
+						setLocalStreamingResponse('');
+						streamingResponseRef.current = '';
+						onStreamingResponse?.('');
+						onDisplayedResponse?.('');
+					}
+				}, 5000); // 5 second timeout
+
+				// Fallback: if no SSE response after 10 seconds, add a placeholder message
+				fallbackTimeoutRef.current = setTimeout(() => {
+					if (isSending && !streamingResponseRef.current.trim()) {
+						const fallbackMsg: Message = {
+							id: Date.now().toString(),
+							content:
+								'Response received. Please check the chat for the full message.',
+							sender: 'ai',
+							timestamp: new Date().toLocaleTimeString(),
+						};
+						addMessage(currentChatIdRef.current || chatId, fallbackMsg);
+						setIsSending(false);
+						onStreamingStatus?.(false);
+					}
+				}, 10000);
 			} else {
 				throw new Error('Failed to send message');
 			}
