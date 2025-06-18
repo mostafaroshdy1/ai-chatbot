@@ -13,4 +13,5 @@ docker-compose up --build
 
 
 # Database
-- In models table add the api keys and models (openai and gemini currently supported)
+- In ai provider table add the supported providers (only gemini & openai for now)
+- In models table add the api keys and the AI models 
