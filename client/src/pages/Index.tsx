@@ -15,6 +15,13 @@ import { aiApi } from '@/lib/api/ai';
 import { toast } from '@/components/ui/use-toast';
 import { useNavigate, useParams } from 'react-router-dom';
 
+interface Chat {
+	id: string;
+	label: string;
+	createdAt: string;
+	isTemp?: boolean;
+}
+
 interface Message {
 	id: string;
 	content: string;
@@ -37,72 +44,176 @@ const Index = () => {
 	const [streamingResponse, setStreamingResponse] = useState('');
 	const [displayedResponse, setDisplayedResponse] = useState('');
 	const [isStreaming, setIsStreaming] = useState(false);
+	const [chats, setChats] = useState<Chat[]>([]);
+	const [messagesByChatId, setMessagesByChatId] = useState<
+		Record<string, Message[]>
+	>({});
+	const [selectedQuestion, setSelectedQuestion] = useState<string>('');
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 	const sidebarRef = useRef<HTMLDivElement>(null);
 	const navigate = useNavigate();
 	const { chatId: urlChatId } = useParams();
 
-	// Fetch chats with infinite scroll
-	const {
-		data: chatsData,
-		fetchNextPage: fetchNextChats,
-		hasNextPage: hasMoreChats,
-		isFetchingNextPage: isFetchingMoreChats,
-	} = useInfiniteQuery({
-		queryKey: ['chats'],
-		queryFn: ({ pageParam = 0 }) => aiApi.getChats(pageParam),
-		getNextPageParam: (lastPage, allPages) => {
-			// If we got less than 20 items, we've reached the end
-			return lastPage.length < 20 ? undefined : allPages.length * 20;
-		},
-		initialPageParam: 0,
-	});
+	// Sync currentChatId with URL
+	useEffect(() => {
+		if (urlChatId && urlChatId !== currentChatId) {
+			setCurrentChatId(urlChatId);
 
-	// Fetch messages for current chat
-	const { data: messagesData, isLoading: isLoadingMessages } = useQuery({
-		queryKey: ['messages', currentChatId],
-		queryFn: () => aiApi.getChatMessages(currentChatId!),
-		enabled: !!currentChatId,
-	});
+			// Fetch messages for the chat if it's not a temp chat
+			const selectedChat = chats.find((chat) => chat.id === urlChatId);
+			if (selectedChat && !selectedChat.isTemp) {
+				const fetchMessages = async () => {
+					try {
+						const messages = await aiApi.getChatMessages(urlChatId);
+						const formattedMessages: Message[] = messages.map((msg) => ({
+							id: msg.createdAt,
+							content: msg.content,
+							sender: msg.role === 'user' ? 'user' : 'ai',
+							timestamp: msg.createdAt,
+						}));
+						setMessagesByChatId((prev) => ({
+							...prev,
+							[urlChatId]: formattedMessages,
+						}));
+					} catch (error) {
+						console.error('Error fetching messages:', error);
+						toast({
+							title: 'Error',
+							description: 'Failed to load chat messages',
+							variant: 'destructive',
+						});
+					}
+				};
+				fetchMessages();
+			}
+		}
+	}, [urlChatId, currentChatId, chats]);
 
-	// Flatten chats data
-	const chats = chatsData?.pages.flatMap((page) => page) || [];
-
-	// Sort messages data
-	const messages =
-		messagesData
-			?.sort(
-				(a, b) =>
-					new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-			)
-			.map((msg) => ({
-				id: msg.createdAt,
-				content: msg.content,
-				sender: msg.role === 'assistant' ? ('ai' as const) : ('user' as const),
-				timestamp: new Date(msg.createdAt).toLocaleTimeString([], {
-					hour: '2-digit',
-					minute: '2-digit',
-				}),
-			})) || [];
-
-	// Append streaming message if streaming
-	const allMessages = [...messages];
-	if (isStreaming && displayedResponse) {
-		allMessages.push({
-			id: 'streaming',
-			content: displayedResponse,
-			sender: 'ai',
-			timestamp: new Date().toLocaleTimeString(),
-		});
-	}
-
-	const scrollToBottom = () => {
+	// Scroll to bottom on messages change
+	useEffect(() => {
 		messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+	}, [currentChatId, messagesByChatId]);
+
+	// On mount, fetch chats from server (for real chats)
+	useEffect(() => {
+		const fetchChats = async () => {
+			const serverChats = await aiApi.getChats(0);
+			setChats(
+				serverChats.map((chat) => ({
+					id: chat.chatId,
+					label: chat.label,
+					createdAt: chat.createdAt,
+					isTemp: false,
+				}))
+			);
+		};
+		fetchChats();
+	}, []);
+
+	// On chat select
+	const handleChatSelect = async (chatId: string) => {
+		setCurrentChatId(chatId);
+		navigate(`/${chatId}`);
+
+		// Fetch messages for the selected chat if it's not a temp chat
+		const selectedChat = chats.find((chat) => chat.id === chatId);
+		if (selectedChat && !selectedChat.isTemp) {
+			try {
+				const messages = await aiApi.getChatMessages(chatId);
+				const formattedMessages: Message[] = messages.map((msg) => ({
+					id: msg.createdAt, // Using timestamp as ID since API doesn't provide message ID
+					content: msg.content,
+					sender: msg.role === 'user' ? 'user' : 'ai',
+					timestamp: msg.createdAt,
+				}));
+				setMessagesByChatId((prev) => ({
+					...prev,
+					[chatId]: formattedMessages,
+				}));
+			} catch (error) {
+				console.error('Error fetching messages:', error);
+				toast({
+					title: 'Error',
+					description: 'Failed to load chat messages',
+					variant: 'destructive',
+				});
+			}
+		}
 	};
 
-	useEffect(() => {
-		scrollToBottom();
-	}, [messages]);
+	// On new chat (create temp chat)
+	const handleNewChat = () => {
+		const tempId = `temp-${Date.now()}`;
+		const tempChat = {
+			id: tempId,
+			label: 'New Chat',
+			createdAt: new Date().toISOString(),
+			isTemp: true,
+		};
+		setChats((prev) => [tempChat, ...prev]);
+		setMessagesByChatId((prev) => ({ ...prev, [tempId]: [] }));
+		setCurrentChatId(tempId);
+		navigate(`/${tempId}`);
+	};
+
+	// On first message, replace temp chat with real chat
+	const handleFirstMessage = (oldId: string, newId: string, label: string) => {
+		setChats((prev) => {
+			// If oldId and newId are the same, it's a chat rename
+			if (oldId === newId) {
+				return prev.map((chat) =>
+					chat.id === oldId ? { ...chat, label } : chat
+				);
+			}
+			// Otherwise, it's a temp chat being replaced
+			return prev.map((chat) =>
+				chat.id === oldId ? { ...chat, id: newId, label, isTemp: false } : chat
+			);
+		});
+
+		// Only update messages if it's a different chat ID
+		if (oldId !== newId) {
+			setMessagesByChatId((prev) => {
+				const messages = prev[oldId] || [];
+				const { [oldId]: _, ...rest } = prev;
+				return { ...rest, [newId]: messages };
+			});
+			setCurrentChatId(newId);
+			navigate(`/${newId}`);
+		}
+	};
+
+	// Add message to current chat
+	const addMessage = (chatId: string, msg: Message) => {
+		setMessagesByChatId((prev) => {
+			const updated = {
+				...prev,
+				[chatId]: [...(prev[chatId] || []), msg],
+			};
+			return updated;
+		});
+	};
+
+	// Update existing message in current chat
+	const updateMessage = (
+		chatId: string,
+		messageId: string,
+		newContent: string
+	) => {
+		setMessagesByChatId((prev) => {
+			const chatMessages = prev[chatId] || [];
+			const updatedMessages = chatMessages.map((msg) =>
+				msg.id === messageId ? { ...msg, content: newContent } : msg
+			);
+			return {
+				...prev,
+				[chatId]: updatedMessages,
+			};
+		});
+	};
+
+	// Messages for current chat
+	const messages = currentChatId ? messagesByChatId[currentChatId] || [] : [];
 
 	useEffect(() => {
 		// Check for existing session
@@ -113,45 +224,6 @@ const Index = () => {
 			setCurrentUser(user);
 		}
 	}, []);
-
-	// Sync currentChatId with URL
-	useEffect(() => {
-		if (urlChatId && urlChatId !== currentChatId) {
-			setCurrentChatId(urlChatId);
-		}
-	}, [urlChatId]);
-
-	// Handle sidebar scroll for infinite loading
-	const handleSidebarScroll = (e: React.UIEvent<HTMLDivElement>) => {
-		const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-		if (
-			scrollHeight - scrollTop <= clientHeight * 1.5 &&
-			hasMoreChats &&
-			!isFetchingMoreChats
-		) {
-			fetchNextChats();
-		}
-	};
-
-	const handleNewChat = async () => {
-		try {
-			const response = await aiApi.createChat();
-			setCurrentChatId(response.chatId);
-			navigate(`/${response.chatId}`);
-		} catch (error) {
-			console.error('Failed to create new chat:', error);
-			toast({
-				title: 'Error',
-				description: 'Failed to create new chat',
-				variant: 'destructive',
-			});
-		}
-	};
-
-	const handleChatSelect = (chatId: string) => {
-		setCurrentChatId(chatId);
-		navigate(`/${chatId}`);
-	};
 
 	const handleLogin = async (email: string, password: string) => {
 		try {
@@ -177,39 +249,24 @@ const Index = () => {
 		if (!currentChatId) {
 			handleNewChat();
 		}
-		// Wait for next tick to ensure currentChatId is set
-		setTimeout(() => {
-			handleSendMessage(question);
-		}, 0);
+		setSelectedQuestion(question);
 	};
 
-	const handleSendMessage = async (content: string, attachments?: File[]) => {
-		if (!currentChatId) {
-			handleNewChat();
-			// Wait for the new chat to be created
-			setTimeout(() => {
-				handleSendMessage(content, attachments);
-			}, 0);
-			return;
-		}
+	const handleQuestionProcessed = () => {
+		setSelectedQuestion('');
+	};
 
-		setIsLoading(true);
-
-		try {
-			const selectedModelData = await aiApi.getModels();
-			if (!selectedModelData.length) throw new Error('No models available');
-
-			await aiApi.sendMessage(currentChatId, content, selectedModelData[0].id);
-		} catch (error) {
-			console.error('Error sending message:', error);
-			toast({
-				title: 'Error',
-				description:
-					error instanceof Error ? error.message : 'Failed to send message',
-				variant: 'destructive',
-			});
-		} finally {
-			setIsLoading(false);
+	// Test function to add a message manually
+	const addTestMessage = () => {
+		if (currentChatId) {
+			const testMsg: Message = {
+				id: Date.now().toString(),
+				content:
+					'This is a test AI message to verify the chat display is working.',
+				sender: 'ai',
+				timestamp: new Date().toLocaleTimeString(),
+			};
+			addMessage(currentChatId, testMsg);
 		}
 	};
 
@@ -221,14 +278,14 @@ const Index = () => {
 					onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
 					onNewChat={handleNewChat}
 					chats={chats.map((chat) => ({
-						id: chat.chatId,
+						id: chat.id,
 						title: chat.label || 'New Chat',
 						timestamp: new Date(chat.createdAt).toLocaleString(),
 					}))}
 					onChatSelect={handleChatSelect}
 					selectedChatId={currentChatId}
 					ref={sidebarRef}
-					onScroll={handleSidebarScroll}
+					onScroll={() => {}}
 					isLoggedIn={isLoggedIn}
 					onLogin={() => setShowLoginModal(true)}
 					onLogout={handleLogout}
@@ -237,24 +294,36 @@ const Index = () => {
 				<div className="flex flex-col flex-1 h-full">
 					<div className="flex-1 overflow-y-auto">
 						<ScrollArea className="h-full px-4 py-6">
-							{allMessages.map((msg) => (
-								<ChatMessage key={msg.id} message={msg} />
-							))}
+							{messages.length > 0 ? (
+								messages.map((msg) => (
+									<ChatMessage key={msg.id} message={msg} />
+								))
+							) : (
+								<DefaultQuestions onQuestionSelect={handleQuestionSelect} />
+							)}
 							<div ref={messagesEndRef} />
 						</ScrollArea>
 					</div>
 					<ChatInput
-						onChatCreated={(chatId, label) => {
-							setCurrentChatId(chatId);
-							navigate(`/${chatId}`);
-						}}
+						currentChatId={currentChatId}
+						isTempChat={chats.find((c) => c.id === currentChatId)?.isTemp}
+						onFirstMessage={handleFirstMessage}
+						addMessage={addMessage}
+						updateMessage={updateMessage}
 						disabled={!isLoggedIn}
+						selectedQuestion={selectedQuestion}
 						onStreamingResponse={setStreamingResponse}
 						onDisplayedResponse={setDisplayedResponse}
 						onStreamingStatus={setIsStreaming}
+						onQuestionProcessed={handleQuestionProcessed}
 					/>
 				</div>
 			</div>
+			<LoginModal
+				isOpen={showLoginModal}
+				onClose={() => setShowLoginModal(false)}
+				onLogin={handleLogin}
+			/>
 		</ThemeProvider>
 	);
 };

@@ -22,6 +22,26 @@ export const useSSE = ({ onMessage, onComplete, onError }: UseSSEOptions) => {
 	const isConnecting = useRef(false);
 	const controller = useRef<AbortController | null>(null);
 
+	// Cleanup on unmount
+	useEffect(() => {
+		return () => {
+			if (controller.current) {
+				console.log('[SSE] Cleaning up connection on unmount');
+				controller.current.abort();
+			}
+		};
+	}, []);
+
+	const disconnect = useCallback(() => {
+		if (controller.current) {
+			console.log('[SSE] Disconnecting manually');
+			controller.current.abort();
+			controller.current = null;
+		}
+		setIsConnected(false);
+		isConnecting.current = false;
+	}, []);
+
 	const connect = useCallback(
 		async (chatId) => {
 			// Don't attempt connection if no chatId
@@ -35,6 +55,12 @@ export const useSSE = ({ onMessage, onComplete, onError }: UseSSEOptions) => {
 					'[SSE] Skipping connection - max retries reached or already connecting'
 				);
 				return;
+			}
+
+			// Close any existing connection
+			if (controller.current) {
+				console.log('[SSE] Closing existing connection');
+				controller.current.abort();
 			}
 
 			isConnecting.current = true;
@@ -76,21 +102,30 @@ export const useSSE = ({ onMessage, onComplete, onError }: UseSSEOptions) => {
 						},
 						onmessage(event) {
 							try {
+								console.log('[SSE] Received message:', event.data);
 								if (event.data) {
 									const message: SSEMessage = JSON.parse(event.data);
 
 									if (message.text) {
+										console.log('[SSE] Processing text chunk:', message.text);
 										onMessage(message.text);
 									}
 
 									if (message.isFinal) {
 										console.log('[SSE] Stream complete, closing connection');
-										controller.current?.abort();
-										onComplete();
+										// Add a small delay before completing to ensure all data is processed
+										setTimeout(() => {
+											onComplete();
+										}, 100);
 									}
 								}
 							} catch (err) {
-								console.error('[SSE] Failed to parse message:', err);
+								console.error(
+									'[SSE] Failed to parse message:',
+									err,
+									'Raw data:',
+									event.data
+								);
 							}
 						},
 						onerror(err) {
@@ -109,6 +144,8 @@ export const useSSE = ({ onMessage, onComplete, onError }: UseSSEOptions) => {
 							isConnecting.current = false;
 							console.log('[SSE] Connection closed');
 						},
+						// Add keepalive to prevent premature closure
+						openWhenHidden: true,
 					}
 				);
 			} catch (err) {
@@ -132,5 +169,6 @@ export const useSSE = ({ onMessage, onComplete, onError }: UseSSEOptions) => {
 		isConnected,
 		error,
 		connect,
+		disconnect,
 	};
 };

@@ -137,6 +137,9 @@ const Sidebar = forwardRef<HTMLDivElement, SidebarProps>(
 							{!isCollapsed && 'Login'}
 						</Button>
 					)}
+					<div className="mt-2">
+						<ThemeToggle isCollapsed={isCollapsed} />
+					</div>
 				</div>
 			</div>
 		);
